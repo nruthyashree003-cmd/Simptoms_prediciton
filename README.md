@@ -2,9 +2,9 @@
 
 A local-first React educational symptom checker. It supports symptom search and browsing, live illustrative pattern matches, editable saved checks, and device-local history.
 
-## Deployed in vercel
+## View the Live Application (Deployed in vercel)
 
-simptoms-prediciton-teal.vercel.app
+[Live Demo](https://simptoms-prediciton-teal.vercel.app/)
 
 sorry
 
