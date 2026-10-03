@@ -5,8 +5,7 @@ A local-first React educational symptom checker. It supports symptom search and 
 ## View the Live Application (Deployed in vercel)
 
 [Live Demo](https://simptoms-prediciton-teal.vercel.app/)
-
-sorry
+https://simptoms-prediciton-teal.vercel.app
 
 ## Run locally
 
