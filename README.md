@@ -1,25 +1,37 @@
 # Clearwell symptom explorer
 
-A local-first React educational symptom checker. It supports symptom search and browsing, live illustrative pattern matches, editable saved checks, and device-local history.
-
-## View the Live Application (Deployed in vercel)
-
-[Live Demo](https://simptoms-prediciton-teal.vercel.app/)
-https://simptoms-prediciton-teal.vercel.app
+A local-first React educational symptom checker. It supports symptom search and browsing, live dataset-based pattern matches, editable saved checks, and device-local history.
 
 ## Run locally
 
-```sh
+```powershell
 npm install
 npm run dev
 ```
 
 Create a production build with `npm run build`.
 
-The project pins Vite's `esbuild` dependency in `package-lock.json` and explicitly allows that exact version's install script in `package.json` for npm versions that block unapproved dependency scripts.
+## Train the local demo model
+
+The provided CSV is intentionally excluded from Git because it is large. To retrain the model, place it at:
+
+```text
+dataset/Final_Augmented_dataset_Diseases_and_Symptoms.csv
+```
+
+Then run:
+
+```powershell
+python scripts/train_model.py
+npm run build
+```
+
+The script uses a deterministic, disease-stratified 1,000-record sample (seed `42`), includes every disease label when possible, and writes the aggregate model artifact to `src/trained-model.json`. It does not put the source CSV or individual sample records into the application bundle. The browser loads this pre-trained artifact; it does not train on startup. Re-run the script after replacing the source dataset.
 
 ## Model and safety
 
-The app trains a small Naive Bayes model in the browser at startup from the invented example records bundled in `src/model.js`. The examples are for demonstrating how a transparent model can rank symptom patterns; they are not a clinical dataset. The displayed score is a relative demo match score—not a probability, medical assessment, or diagnosis. This model has not been clinically validated.
+The browser uses a Bernoulli Naive Bayes classifier with add-one smoothing over the 377 symptom features. The selected sample covers 773 disease labels, so many labels have very few training examples. The displayed relative match score is not a probability, medical assessment, or diagnosis.
 
-Selected urgent symptoms bypass the model and all condition suggestions. The app instead tells users to contact emergency services or seek emergency care. This educational tool cannot assess or rule out a health condition. Saved checks stay in the current browser's local storage and are not sent to a server.
+The dataset's origin and clinical representativeness have not been independently verified. This model has not been clinically validated and must not be used for medical decisions. Urgent symptoms suppress condition suggestions and show urgent-care guidance; this is not a substitute for professional assessment.
+
+Saved checks remain in the current browser's local storage. They are not sent to a server. Do not enter identifying or sensitive medical information into this educational demo.

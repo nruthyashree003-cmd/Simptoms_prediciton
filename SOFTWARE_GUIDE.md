@@ -31,17 +31,17 @@ The compiled site is written to the `dist` directory. For deployment, the hostin
 ### Example A: Explore cold-like symptoms
 
 1. Open **Symptom check**.
-2. Search for and select **Runny nose**, **Sore throat**, and **Cough**.
-3. The results panel updates as the selections change. It may show **Common cold pattern** near the top because those symptoms overlap with the bundled teaching examples for that pattern.
-4. The page lists shared signals so the user can see why a pattern appeared.
+2. Search for and select symptoms such as **Runny nose**, **Sore throat**, and **Cough** if they appear in the loaded dataset catalog.
+3. The results panel updates as the selections change and ranks disease labels using the local model.
+4. The page lists selected symptoms found in each label's training records so the user can see some of the shared signals.
 5. Select another symptom or remove one from the selection to update the results immediately.
 6. Choose **Save this check** to save it in the current browser.
 
-This result is only a demonstration of matching symptom patterns. It does not establish that the user has a cold.
+These results are only experimental dataset matches. They do not establish that the user has any listed disease.
 
 ### Example B: An urgent symptom
 
-1. Search for and select **Chest pain** or **Trouble breathing**.
+1. Search for and select **Shortness Of Breath**, **Difficulty Breathing**, or **Sharp Chest Pain** from the CSV-derived catalog.
 2. Clearwell displays urgent-care guidance instead of condition suggestions.
 3. A saved check with an urgent symptom has no condition matches.
 
@@ -61,21 +61,21 @@ Saved checks are stored in the browser's `localStorage`, under the key `clearwel
 
 ### Loading state
 
-When the page starts, the interface briefly shows a loading state and then trains the small demo model in the browser. There is no remote model server or external AI API.
+When the page starts, the interface briefly shows a loading state while the browser prepares the locally bundled model artifact. There is no remote model server or external AI API.
 
 ## 5. Technical explanation of the model
 
-The current model is a small **Naive Bayes classifier** implemented directly in JavaScript. It is included to demonstrate a basic machine-learning workflow:
+The current model is a **Bernoulli Naive Bayes classifier** implemented directly in JavaScript. Its parameters are generated offline by `scripts/train_model.py` from the provided CSV:
 
-1. **Training examples:** `src/model.js` contains 21 invented example records. Each record has a pattern label and a list of symptoms.
-2. **Counting:** At startup, `trainModel()` counts how often each symptom appears for each pattern and computes a prior from the number of examples for that pattern.
-3. **Scoring:** `rankConditions()` evaluates each pattern against the selected symptoms. It uses a Bernoulli Naive Bayes-style calculation: each catalog symptom contributes evidence for being present or absent. Add-one smoothing avoids zero probabilities for symptom combinations not represented in the small sample.
-4. **Ranking:** Patterns are ordered by the model's internal log score, and up to three are shown.
-5. **Explanation:** The interface lists the selected symptoms that overlap with each pattern's feature list.
+1. **Input data:** A CSV row contains a disease label and 377 binary symptom columns.
+2. **Stratified sampling:** The Python script reads the full dataset, assigns every disease label at least one sample, then distributes the remaining places proportionally across labels. Sampling is deterministic (seed `42`) and totals 1,000 records.
+3. **Training:** The script counts symptom-presence values for each disease in the selected sample and writes aggregate counts to `src/trained-model.json`; individual source records are not included in the app bundle.
+4. **Scoring:** In the browser, `trainModel()` prepares the stored class counts and priors. `rankConditions()` evaluates each disease against selected and unselected symptom features. Add-one smoothing avoids zero probabilities.
+5. **Ranking and explanation:** The disease labels are ordered by their internal log scores, and up to three are shown. The interface lists selected symptoms observed in each label's training records.
 
-The displayed number is a **relative demo match score**, not a calibrated probability or a measure of medical risk. In this implementation, the display number is derived from result rank and the count of shared signals; it is not the classifier's posterior probability. The small invented examples are not a clinical dataset and cannot establish real-world accuracy.
+The displayed number is a **relative match score**, not a calibrated probability or a measure of medical risk. It compares classifier scores to the highest-ranked result. The 1,000-record sample covers 773 labels, leaving many labels with only one or two examples; the dataset's origin and clinical representativeness have not been independently verified. This cannot establish real-world accuracy.
 
-The urgent-symptom check happens in the application interface before results are rendered. When a selected symptom is marked as urgent in the catalog, Clearwell suppresses all condition suggestions.
+The urgent-symptom check happens in the application interface before results are rendered. A small list of high-risk symptom phrases is marked in the catalog; when one is selected, Clearwell suppresses all condition suggestions.
 
 ## 6. Technologies and why they are used
 
@@ -85,6 +85,7 @@ The urgent-symptom check happens in the application interface before results are
 | JavaScript ES modules | Implements catalog handling, local model training, and ranking | Keeps the educational demo logic readable and runs in the browser |
 | CSS | Provides layout, responsive styling, colors, and visual feedback | Avoids adding a UI framework for a small app |
 | Vite | Runs the development server and builds the production site | Provides a lightweight React development and build workflow |
+| Python standard library | Selects and aggregates the stratified dataset sample before deployment | Processes the large CSV without adding training dependencies |
 | Browser `localStorage` | Persists saved checks on the current device | Enables history without a backend or account |
 | npm | Installs and locks project dependencies | Makes local setup and repeatable deployment builds straightforward |
 
@@ -93,9 +94,9 @@ The app has no database, API server, account system, or external AI service. Thi
 ## 7. Important limitations and privacy
 
 - This is an educational demonstration, not a diagnostic or treatment tool.
-- The bundled examples are invented teaching data, not a sourced or clinically validated dataset.
+- The selected 1,000 examples come from the user-provided CSV, but the dataset's provenance and representativeness have not been independently verified.
+- The sample spans 773 disease labels, so many labels have only one or two examples and predictions may be unreliable.
 - The model's matches and scores must not be used to make medical decisions.
 - A real medical model would need an appropriate, consented and de-identified dataset, careful data-quality review, independent testing, clinical and regulatory review as applicable, and ongoing monitoring.
 - The app stores saved checks locally in the browser. Clearing browser storage removes them. It does not currently send check data to a server.
 - Do not enter personal identifying or sensitive medical information into this demo.
-

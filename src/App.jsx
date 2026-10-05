@@ -1,7 +1,60 @@
 import { useEffect, useMemo, useState } from 'react';
-import { conditionCatalog, rankConditions, redFlagAdvice, symptomCatalog, trainModel } from './model.js';
+import { conditionCatalog, rankConditions, redFlagAdvice, sampleMetadata, symptomCatalog, trainModel } from './model.js';
 
 const HISTORY_KEY = 'clearwell-symptom-checks-v1';
+const legacySymptomNames = {
+  runny_nose: 'Runny nose',
+  sneezing: 'Sneezing',
+  sore_throat: 'Sore throat',
+  cough: 'Cough',
+  fever: 'Fever',
+  fatigue: 'Fatigue',
+  body_aches: 'Body aches',
+  headache: 'Headache',
+  light_sensitivity: 'Light sensitivity',
+  nausea: 'Nausea',
+  vomiting: 'Vomiting',
+  diarrhea: 'Diarrhea',
+  stomach_cramps: 'Stomach cramps',
+  itchy_eyes: 'Itchy eyes',
+  watery_eyes: 'Watery eyes',
+  rash: 'Rash',
+  heartburn: 'Heartburn',
+  stuffy_nose: 'Stuffy nose',
+  chills: 'Chills',
+  dizziness: 'Dizziness',
+  trouble_breathing: 'Trouble breathing',
+  chest_pain: 'Chest pain',
+  confusion: 'Sudden confusion',
+  fainting: 'Fainting',
+  severe_bleeding: 'Severe bleeding',
+  blue_lips: 'Blue or gray lips',
+  sudden_weakness: 'Sudden one-sided weakness',
+  severe_allergic_reaction: 'Severe allergic reaction',
+};
+const legacyConditionNames = {
+  'common-cold': 'Common cold pattern',
+  'seasonal-allergies': 'Seasonal allergy pattern',
+  'flu-like': 'Flu-like pattern',
+  'migraine-like': 'Migraine-like headache pattern',
+  'stomach-bug': 'Stomach upset pattern',
+  'tension-headache': 'Tension-type headache pattern',
+  reflux: 'Reflux-like discomfort pattern',
+};
+const legacyUrgentIds = new Set([
+  'trouble_breathing',
+  'chest_pain',
+  'confusion',
+  'fainting',
+  'severe_bleeding',
+  'blue_lips',
+  'sudden_weakness',
+  'severe_allergic_reaction',
+]);
+
+function readableId(id) {
+  return id.replace(/[_-]+/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 function readHistory() {
   try {
@@ -35,8 +88,15 @@ function App() {
     localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
   }, [history]);
 
-  const redFlags = selected.filter((id) => symptomCatalog.find((symptom) => symptom.id === id)?.redFlag);
-  const matches = useMemo(() => (model && !redFlags.length ? rankConditions(selected, model) : []), [model, selected, redFlags.length]);
+  const redFlags = selected.filter((id) =>
+    symptomCatalog.find((symptom) => symptom.id === id)?.redFlag || legacyUrgentIds.has(id),
+  );
+  const supportedSelected = selected.filter((id) => symptomCatalog.some((symptom) => symptom.id === id));
+  const unsupportedSelected = selected.filter((id) => !symptomCatalog.some((symptom) => symptom.id === id));
+  const matches = useMemo(
+    () => (model && !redFlags.length ? rankConditions(supportedSelected, model) : []),
+    [model, supportedSelected, redFlags.length],
+  );
   const filteredSymptoms = symptomCatalog.filter((symptom) =>
     symptom.name.toLowerCase().includes(query.trim().toLowerCase()),
   );
@@ -102,11 +162,11 @@ function App() {
   }
 
   function getSymptomName(id) {
-    return symptomCatalog.find((symptom) => symptom.id === id)?.name || id;
+    return symptomCatalog.find((symptom) => symptom.id === id)?.name || legacySymptomNames[id] || readableId(id);
   }
 
   function getConditionName(id) {
-    return conditionCatalog.find((condition) => condition.id === id)?.name || id;
+    return conditionCatalog.find((condition) => condition.id === id)?.name || legacyConditionNames[id] || readableId(id);
   }
 
   return (
@@ -155,11 +215,10 @@ function App() {
                 <label className="search-field">
                   <span aria-hidden="true" className="search-icon">⌕</span>
                   <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search symptoms" aria-label="Search symptoms" />
-                  <kbd>⌘ K</kbd>
                 </label>
                 <div className="symptom-scroll">
                   {loading ? (
-                    <div className="loading-box" role="status"><span className="spinner" /> Preparing the local learning model…</div>
+                    <div className="loading-box" role="status"><span className="spinner" /> Loading the local learning model…</div>
                   ) : filteredSymptoms.length ? (
                     <>
                       {filteredSymptoms.filter((item) => !item.redFlag).map((symptom) => (
@@ -194,7 +253,7 @@ function App() {
               </section>
               <section className="model-note">
                 <span className="model-glyph" aria-hidden="true">◎</span>
-                <div><strong>How this demo works</strong><p>A small Naive Bayes model is trained in your browser using bundled, invented teaching examples. It is not clinically validated and does not provide probabilities or diagnoses.</p></div>
+                <div><strong>About these results</strong><p>A Naive Bayes model was trained from {sampleMetadata.sampleCount.toLocaleString()} stratified dataset records with {sampleMetadata.symptomCount} symptom features across {sampleMetadata.classCount} disease labels. Some labels have only one training record, so results are experimental and may be unreliable. Scores are relative comparisons, not probabilities or diagnoses. This dataset has not been clinically validated.</p></div>
               </section>
             </div>
 
@@ -214,9 +273,12 @@ function App() {
                   {!model ? <div className="loading-result"><span className="spinner" />Loading local model…</div> :
                     !selected.length ? (
                       <div className="results-empty"><div className="empty-orbit"><span>＋</span></div><strong>Your results will take shape here</strong><p>Select a few symptoms to see example patterns that share some of those signals.</p></div>
+                    ) : !matches.length ? (
+                      <div className="results-empty"><strong>These saved symptoms aren’t in the current dataset</strong><p>{unsupportedSelected.map(getSymptomName).join(', ')}. Add a symptom from the current catalog to see an educational match.</p></div>
                     ) : (
                       <>
                         <p className="match-explainer">Educational matches based on your selections. These are not a diagnosis.</p>
+                        {unsupportedSelected.length > 0 && <p className="match-explainer">Older saved symptoms not included in this dataset are ignored: {unsupportedSelected.map(getSymptomName).join(', ')}.</p>}
                         <div className="match-list">{matches.map((condition, index) => (
                           <article className={`match-item ${index === 0 ? 'top-match' : ''}`} key={condition.id}>
                             <div className="match-heading"><div><span className="match-rank">0{index + 1}</span><h3>{condition.name}</h3></div><span className="match-score">{condition.score}<small> / 100</small></span></div>
@@ -238,13 +300,13 @@ function App() {
           </section>
         ) : (
           <section className="library-view panel">
-            <div className="library-header"><div><div className="step-label">REFERENCE <span>·</span> PLAIN-LANGUAGE GUIDE</div><h2>Explore the library</h2><p>Read about common symptoms and illustrative patterns included in this educational demo.</p></div><span className="library-count">{symptomCatalog.length} symptoms<br />{conditionCatalog.length} patterns</span></div>
+            <div className="library-header"><div><div className="step-label">REFERENCE <span>·</span> PLAIN-LANGUAGE GUIDE</div><h2>Explore the library</h2><p>Search symptom features and disease labels included in this educational dataset model.</p></div><span className="library-count">{symptomCatalog.length} symptoms<br />{conditionCatalog.length} labels</span></div>
             <label className="search-field library-search"><span aria-hidden="true" className="search-icon">⌕</span><input type="search" value={libraryQuery} onChange={(event) => setLibraryQuery(event.target.value)} placeholder="Search symptoms or patterns" aria-label="Search library" /></label>
             <div className="library-columns">
               <section><div className="library-section-head"><h3>Symptoms</h3><span>{librarySymptoms.length} entries</span></div>
                 {librarySymptoms.length ? librarySymptoms.map((item) => <article className="library-entry" key={item.id}><div><h4>{item.name} {item.redFlag && <span className="urgent-label">URGENT</span>}</h4><p>{item.description}</p></div><span className="entry-group">{item.group}</span></article>) : <div className="empty-inline">No symptoms found.</div>}
               </section>
-              <section><div className="library-section-head"><h3>Example patterns</h3><span>{libraryConditions.length} entries</span></div>
+              <section><div className="library-section-head"><h3>Dataset labels</h3><span>{libraryConditions.length} entries</span></div>
                 {libraryConditions.length ? libraryConditions.map((item) => <article className="library-entry condition-entry" key={item.id}><div><h4>{item.name}</h4><p>{item.description}</p><p className="advice-copy">{item.advice}</p></div></article>) : <div className="empty-inline">No patterns found.</div>}
               </section>
             </div>
