@@ -2,6 +2,10 @@
 
 A local-first React educational symptom checker. It supports symptom search and browsing, live dataset-based pattern matches, editable saved checks, and device-local history.
 
+## Deployed Link in Vercel
+
+simptoms-prediciton-f4vy.vercel.app
+
 ## Run locally
 
 ```powershell
