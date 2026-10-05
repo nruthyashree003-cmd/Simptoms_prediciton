@@ -5,6 +5,7 @@ A local-first React educational symptom checker. It supports symptom search and 
 ## Deployed Link in Vercel
 
 simptoms-prediciton-f4vy.vercel.app
+[Symptoms Prediction App](https://simptoms-prediciton-f4vy.vercel.app/)
 
 ## Run locally
 
